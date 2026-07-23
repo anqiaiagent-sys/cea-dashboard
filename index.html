@@ -118,7 +118,7 @@
     <div class="metarow">
       <span>数据点 <b>2</b> 个</span>
       <span>区间 <b>2026-07-23 13:39</b> → <b>2026-07-23 16:00</b></span>
-      <span>最后更新 <b>2026-07-23 16:00</b>(北京时间)</span>
+      <span>最后更新 <b>2026-07-23 16:17</b>(北京时间)</span>
     </div>
     <div class="linkrow"><button id="tblBtn">显示/隐藏数据表</button></div>
     <div class="tablewrap" id="tablewrap">
@@ -172,7 +172,7 @@ function draw(){
   box.querySelectorAll('svg').forEach(s=>s.remove());
   const W = box.clientWidth || 800;
   const H = Math.max(240, Math.min(360, Math.round(W*0.42)));
-  const padL = 46, padR = 16, padT = 14, padB = 26;
+  const padL = 58, padR = 16, padT = 14, padB = 26;
   const iw = W - padL - padR, ih = H - padT - padB;
 
   const svgNS = 'http://www.w3.org/2000/svg';
@@ -207,6 +207,8 @@ function draw(){
 
   // y 网格线 + 刻度(含 1.00 基准)
   const ticks = niceTicks(lo, hi, 4);
+  let tickDec = 2;
+  if(ticks.length>1){ const _d=Math.abs(ticks[1]-ticks[0]); if(_d>0) tickDec=Math.max(2,Math.min(6,Math.ceil(-Math.log10(_d)))); }
   ticks.forEach(tv=>{
     const y = Y(tv);
     const ln = document.createElementNS(svgNS,'line');
@@ -219,7 +221,7 @@ function draw(){
     tx.setAttribute('x', padL-8); tx.setAttribute('y', y+3.5);
     tx.setAttribute('text-anchor','end'); tx.setAttribute('fill', muted);
     tx.setAttribute('font-size','11'); tx.setAttribute('font-variant-numeric','tabular-nums');
-    tx.textContent = tv.toFixed(2);
+    tx.textContent = tv.toFixed(tickDec);
     svg.appendChild(tx);
   });
 
