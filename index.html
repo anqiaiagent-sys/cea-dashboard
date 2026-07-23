@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>套利组合 · 业绩看板</title>
+<style>
+  :root{
+    color-scheme: light;
+    --page:#f9f9f7; --surface:#fcfcfb;
+    --text-primary:#0b0b0b; --text-secondary:#52514e; --muted:#898781;
+    --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.10);
+    --series:#2a78d6; --series-soft:rgba(42,120,214,0.10);
+    --good:#006300; --bad:#d03b3b;
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --page:#0d0d0d; --surface:#1a1a19;
+    --text-primary:#ffffff; --text-secondary:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+    --series:#3987e5; --series-soft:rgba(57,135,229,0.14);
+    --good:#0ca30c; --bad:#e34948;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      color-scheme: dark;
+      --page:#0d0d0d; --surface:#1a1a19;
+      --text-primary:#ffffff; --text-secondary:#c3c2b7; --muted:#898781;
+      --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+      --series:#3987e5; --series-soft:rgba(57,135,229,0.14);
+      --good:#0ca30c; --bad:#e34948;
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--page); color:var(--text-primary);
+    font-family:system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    line-height:1.5; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:880px; margin:0 auto; padding:24px 20px 48px}
+  header{display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap}
+  h1{font-size:20px; font-weight:600; margin:0}
+  .sub{color:var(--text-secondary); font-size:13px; margin-top:2px}
+  .toggle{
+    border:1px solid var(--border); background:var(--surface); color:var(--text-secondary);
+    border-radius:999px; padding:5px 12px; font-size:12px; cursor:pointer;
+  }
+  .toggle:hover{color:var(--text-primary)}
+  .tiles{display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:20px 0}
+  @media (max-width:620px){.tiles{grid-template-columns:1fr}}
+  .tile{
+    background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:14px 16px;
+  }
+  .tile .label{font-size:12px; color:var(--text-secondary)}
+  .tile .value{font-size:30px; font-weight:600; margin-top:4px; letter-spacing:-0.5px}
+  .tile .note{font-size:11px; color:var(--muted); margin-top:4px}
+  .value.up{color:var(--good)} .value.down{color:var(--bad)}
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px}
+  .card h2{font-size:14px; font-weight:600; margin:0 0 2px}
+  .card .cap{font-size:12px; color:var(--text-secondary); margin-bottom:8px}
+  .chartbox{position:relative; width:100%}
+  svg{display:block; width:100%; height:auto; touch-action:pan-y}
+  .tip{
+    position:absolute; pointer-events:none; background:var(--surface);
+    border:1px solid var(--border); border-radius:8px; padding:6px 9px; font-size:12px;
+    color:var(--text-primary); box-shadow:0 4px 14px rgba(0,0,0,0.12); opacity:0; transition:opacity .08s;
+    white-space:nowrap; transform:translate(-50%,-115%);
+  }
+  .tip .t{color:var(--muted); font-size:11px}
+  .metarow{display:flex; gap:20px; flex-wrap:wrap; margin-top:14px; color:var(--text-secondary); font-size:13px}
+  .metarow b{color:var(--text-primary); font-weight:600}
+  footer{margin-top:22px; color:var(--muted); font-size:12px; line-height:1.7}
+  .tablewrap{margin-top:14px; overflow:auto; display:none}
+  table{border-collapse:collapse; width:100%; font-size:12px; font-variant-numeric:tabular-nums}
+  th,td{text-align:right; padding:5px 10px; border-bottom:1px solid var(--grid)}
+  th:first-child,td:first-child{text-align:left}
+  .linkrow{margin-top:8px}
+  .linkrow button{background:none;border:none;color:var(--series);cursor:pointer;font-size:12px;padding:0}
+  .empty{color:var(--muted); font-size:13px; padding:30px 0; text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>套利组合 · 业绩看板</h1>
+      <div class="sub">净值以起始日 = 1.00 · 仅展示业绩(不含金额)</div>
+    </div>
+    <button class="toggle" id="themeBtn">切换深/浅色</button>
+  </header>
+
+  <div class="tiles">
+    <div class="tile">
+      <div class="label">累计收益率</div>
+      <div class="value flat">0.00%</div>
+      <div class="note">起始日至今,已扣除出入金</div>
+    </div>
+    <div class="tile">
+      <div class="label">最大回撤</div>
+      <div class="value">0.00%</div>
+      <div class="note">净值从高点回落的最大幅度</div>
+    </div>
+    <div class="tile">
+      <div class="label">年化收益率</div>
+      <div class="value flat">—</div>
+      <div class="note">数据不足,暂无法计算</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>净值曲线</h2>
+    <div class="cap">起始点归一化为 1.00;曲线只反映业绩涨跌,不代表金额。</div>
+    <div class="chartbox" id="chartbox">
+      <div class="tip" id="tip"></div>
+    </div>
+    <div class="metarow">
+      <span>数据点 <b>1</b> 个</span>
+      <span>区间 <b>2026-07-23 13:39</b> → <b>2026-07-23 13:39</b></span>
+      <span>最后更新 <b>2026-07-23 15:20</b>(北京时间)</span>
+    </div>
+    <div class="linkrow"><button id="tblBtn">显示/隐藏数据表</button></div>
+    <div class="tablewrap" id="tablewrap">
+      <table id="tbl"><thead><tr><th>时间(北京)</th><th>净值</th><th>较起始</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+
+  <footer>
+    <div>说明:净值 = 组合业绩指数,起始点记为 1.00。收益率已用出入金记录扣除充值/提取,只反映交易盈亏。</div>
+    <div>数据每 8 小时更新一次(北京 00:00 / 08:00 / 16:00);最大回撤只基于这些时点,盘中短时波动可能未被捕捉。</div>
+    <div>本页仅供了解业绩表现,不含任何资金金额、账户余额或密钥,不构成投资建议。</div>
+  </footer>
+</div>
+
+<script>
+const DATA = [{"t": "2026-07-23 13:39", "nav": 1.0}];
+
+// ---------- 主题切换 ----------
+const themeBtn = document.getElementById('themeBtn');
+themeBtn.addEventListener('click', ()=>{
+  const cur = document.documentElement.getAttribute('data-theme');
+  const next = cur === 'dark' ? 'light' : (cur === 'light' ? 'dark'
+      : (matchMedia('(prefers-color-scheme: dark)').matches ? 'light' : 'dark'));
+  document.documentElement.setAttribute('data-theme', next);
+  draw();
+});
+
+// ---------- 数据表 ----------
+(function(){
+  const tb = document.querySelector('#tbl tbody');
+  DATA.forEach(d=>{
+    const tr = document.createElement('tr');
+    const chg = (d.nav-1)*100;
+    tr.innerHTML = `<td>${d.t}</td><td>${d.nav.toFixed(4)}</td><td>${(chg>=0?'+':'')+chg.toFixed(2)}%</td>`;
+    tb.appendChild(tr);
+  });
+  document.getElementById('tblBtn').addEventListener('click', ()=>{
+    const w = document.getElementById('tablewrap');
+    w.style.display = w.style.display === 'block' ? 'none' : 'block';
+  });
+})();
+
+// ---------- 画图 ----------
+const box = document.getElementById('chartbox');
+const tip = document.getElementById('tip');
+let pts = [];   // 屏幕坐标缓存
+
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+function draw(){
+  box.querySelectorAll('svg').forEach(s=>s.remove());
+  const W = box.clientWidth || 800;
+  const H = Math.max(240, Math.min(360, Math.round(W*0.42)));
+  const padL = 46, padR = 16, padT = 14, padB = 26;
+  const iw = W - padL - padR, ih = H - padT - padB;
+
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS,'svg');
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('width', W); svg.setAttribute('height', H);
+  box.appendChild(svg);
+
+  if(!DATA.length){
+    const t = document.createElementNS(svgNS,'text');
+    t.setAttribute('x', W/2); t.setAttribute('y', H/2);
+    t.setAttribute('text-anchor','middle'); t.setAttribute('fill', cssVar('--muted'));
+    t.setAttribute('font-size','13'); t.textContent = '暂无数据,取数攒够后自动显示曲线';
+    svg.appendChild(t); return;
+  }
+
+  // y 轴范围(净值),留 8% 余量;单点时给个对称小区间
+  let lo = Math.min(...DATA.map(d=>d.nav));
+  let hi = Math.max(...DATA.map(d=>d.nav));
+  if(hi-lo < 1e-6){ lo -= 0.01; hi += 0.01; }
+  const padY = (hi-lo)*0.10; lo -= padY; hi += padY;
+  // 让 1.00 基准尽量落在范围内
+  lo = Math.min(lo, 1.0 - (hi-lo)*0.02);
+  hi = Math.max(hi, 1.0 + (hi-lo)*0.02);
+
+  const n = DATA.length;
+  const X = i => padL + (n===1 ? iw/2 : iw * i/(n-1));
+  const Y = v => padT + ih * (1 - (v-lo)/(hi-lo));
+
+  const grid = cssVar('--grid'), axis = cssVar('--axis'), muted = cssVar('--muted');
+  const series = cssVar('--series'), surface = cssVar('--surface');
+
+  // y 网格线 + 刻度(含 1.00 基准)
+  const ticks = niceTicks(lo, hi, 4);
+  ticks.forEach(tv=>{
+    const y = Y(tv);
+    const ln = document.createElementNS(svgNS,'line');
+    ln.setAttribute('x1',padL); ln.setAttribute('x2',W-padR);
+    ln.setAttribute('y1',y); ln.setAttribute('y2',y);
+    ln.setAttribute('stroke', Math.abs(tv-1)<1e-9 ? axis : grid);
+    ln.setAttribute('stroke-width','1');
+    svg.appendChild(ln);
+    const tx = document.createElementNS(svgNS,'text');
+    tx.setAttribute('x', padL-8); tx.setAttribute('y', y+3.5);
+    tx.setAttribute('text-anchor','end'); tx.setAttribute('fill', muted);
+    tx.setAttribute('font-size','11'); tx.setAttribute('font-variant-numeric','tabular-nums');
+    tx.textContent = tv.toFixed(2);
+    svg.appendChild(tx);
+  });
+
+  // x 轴端点日期
+  [0, n-1].forEach(i=>{
+    if(n===1 && i===n-1) return;
+    const tx = document.createElementNS(svgNS,'text');
+    tx.setAttribute('x', X(i)); tx.setAttribute('y', H-8);
+    tx.setAttribute('text-anchor', i===0?'start':'end'); tx.setAttribute('fill', muted);
+    tx.setAttribute('font-size','11');
+    tx.textContent = DATA[i].t.slice(5,10);
+    svg.appendChild(tx);
+  });
+
+  pts = DATA.map((d,i)=>({x:X(i), y:Y(d.nav), d}));
+
+  // 面积填充
+  if(n>1){
+    let ap = `M ${pts[0].x} ${Y(lo)} `;
+    pts.forEach(p=> ap += `L ${p.x} ${p.y} `);
+    ap += `L ${pts[n-1].x} ${Y(lo)} Z`;
+    const area = document.createElementNS(svgNS,'path');
+    area.setAttribute('d', ap); area.setAttribute('fill', 'var(--series-soft)');
+    svg.appendChild(area);
+  }
+
+  // 折线
+  if(n>1){
+    let lp = `M ${pts[0].x} ${pts[0].y} `;
+    pts.slice(1).forEach(p=> lp += `L ${p.x} ${p.y} `);
+    const line = document.createElementNS(svgNS,'path');
+    line.setAttribute('d', lp); line.setAttribute('fill','none');
+    line.setAttribute('stroke', series); line.setAttribute('stroke-width','2');
+    line.setAttribute('stroke-linejoin','round'); line.setAttribute('stroke-linecap','round');
+    svg.appendChild(line);
+  }
+
+  // 末端点(带 surface 描边环)
+  const last = pts[n-1];
+  const dot = document.createElementNS(svgNS,'circle');
+  dot.setAttribute('cx',last.x); dot.setAttribute('cy',last.y); dot.setAttribute('r','4.5');
+  dot.setAttribute('fill',series); dot.setAttribute('stroke',surface); dot.setAttribute('stroke-width','2');
+  svg.appendChild(dot);
+
+  // hover 十字线 + 竖线
+  const vline = document.createElementNS(svgNS,'line');
+  vline.setAttribute('stroke', axis); vline.setAttribute('stroke-width','1'); vline.setAttribute('opacity','0');
+  svg.appendChild(vline);
+  const hdot = document.createElementNS(svgNS,'circle');
+  hdot.setAttribute('r','4.5'); hdot.setAttribute('fill',series);
+  hdot.setAttribute('stroke',surface); hdot.setAttribute('stroke-width','2'); hdot.setAttribute('opacity','0');
+  svg.appendChild(hdot);
+
+  function move(clientX){
+    const r = svg.getBoundingClientRect();
+    const mx = (clientX - r.left) * (W / r.width);
+    let best=0, bd=1e9;
+    pts.forEach((p,i)=>{ const dd=Math.abs(p.x-mx); if(dd<bd){bd=dd;best=i;} });
+    const p = pts[best];
+    vline.setAttribute('x1',p.x); vline.setAttribute('x2',p.x);
+    vline.setAttribute('y1',padT); vline.setAttribute('y2',padT+ih); vline.setAttribute('opacity','1');
+    hdot.setAttribute('cx',p.x); hdot.setAttribute('cy',p.y); hdot.setAttribute('opacity','1');
+    const chg=(p.d.nav-1)*100;
+    tip.innerHTML = `<div class="t">${p.d.t}</div>净值 ${p.d.nav.toFixed(4)} · ${(chg>=0?'+':'')+chg.toFixed(2)}%`;
+    tip.style.left = (p.x / W * (svg.getBoundingClientRect().width)) + 'px';
+    tip.style.top = (p.y / H * (svg.getBoundingClientRect().height)) + 'px';
+    tip.style.opacity = 1;
+  }
+  function leave(){ vline.setAttribute('opacity','0'); hdot.setAttribute('opacity','0'); tip.style.opacity=0; }
+  svg.addEventListener('mousemove', e=>move(e.clientX));
+  svg.addEventListener('mouseleave', leave);
+  svg.addEventListener('touchstart', e=>{ if(e.touches[0]) move(e.touches[0].clientX); }, {passive:true});
+  svg.addEventListener('touchmove', e=>{ if(e.touches[0]) move(e.touches[0].clientX); }, {passive:true});
+  svg.addEventListener('touchend', leave);
+}
+
+function niceTicks(lo, hi, count){
+  const span = hi-lo; if(span<=0) return [lo];
+  const raw = span/count;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const norm = raw/mag;
+  let step = mag * (norm<1.5?1: norm<3?2: norm<7?5:10);
+  const out=[]; let t=Math.ceil(lo/step)*step;
+  for(; t<=hi+1e-9; t+=step) out.push(Math.round(t/step)*step);
+  return out;
+}
+
+draw();
+let rt; addEventListener('resize', ()=>{ clearTimeout(rt); rt=setTimeout(draw,120); });
+</script>
+</body>
+</html>
